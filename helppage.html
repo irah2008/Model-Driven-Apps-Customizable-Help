@@ -1,0 +1,94 @@
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>Help Content</title>
+        <script src="ClientGlobalContext.js.aspx" type="text/javascript"></script>
+        <style>
+            img{
+                max-width:100% !important;
+                object-fit: contain;
+            }
+        </style>
+
+        <script type="text/javascript">
+        function getHelpContent()
+        {
+            var paramContent = window.location.search
+            var urlParams = new URLSearchParams(paramContent);
+            var userLcid = urlParams.get("userlcid");
+            var entityName = urlParams.get("typename");
+            var entryPoint = urlParams.get("entrypoint"); 
+            var entryPointfilter = "<condition attribute='helpcc_entrypoint' operator='null' />";
+            var fetchxml = `<fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>  <entity name='helpcc_helppages'>    <attribute name='helpcc_helppagesid' top ='1'/>    <attribute name='helpcc_name' />
+                            <attribute name='createdon' />
+                            <attribute name='helpcc_helpcontent' />
+                            <order attribute='helpcc_name' descending='false' />
+                            <filter type='and'>
+                            <condition attribute='helpcc_entityname' operator='eq' value='{entityName}' />
+                            {entrypointfilter}
+                            </filter>
+                            <link-entity name='helpcc_languages' from='helpcc_languagesid' to='helpcc_language' link-type='inner' alias='ab'>
+                            <filter type='and'>
+                                <condition attribute='helpcc_languagecode' operator='eq' value='{langcode}' />
+                            </filter>
+                            </link-entity>
+                        </entity>
+                        </fetch>`;
+
+            if(userLcid == null || entityName == null )
+            {
+                document.getElementById("customhelpcontent").innerText="Invalid Configuration! No help content found";
+                return;
+            }
+            else if(entryPoint !=null)
+            {
+                var entryPointValue = entryPoint == 'form'?604490001:604490002;
+                entryPointfilter = "<condition attribute='helpcc_entrypoint' operator='eq' value='{entryPoint}' />";
+                entryPointfilter = entryPointfilter.replace('{entryPoint}',entryPointValue);
+            }
+
+            fetchxml = fetchxml.replace('{entityName}',entityName);
+            fetchxml = fetchxml.replace('{entrypointfilter}', entryPointfilter);
+            fetchxml = fetchxml.replace('{langcode}', userLcid);
+            FetchHelpContent(fetchxml);
+        }
+        
+        function FetchHelpContent(fetchxml)
+        {
+            var encodedFetch = encodeURI(fetchxml);
+
+            var req = new XMLHttpRequest();
+            req.open("GET", Xrm.Page.context.getClientUrl() + "/api/data/v9.1/helpcc_helppageses?fetchXml="+ encodedFetch, true);
+            req.setRequestHeader("OData-MaxVersion", "4.0");
+            req.setRequestHeader("OData-Version", "4.0");
+            req.setRequestHeader("Accept", "application/json");
+            req.setRequestHeader("Prefer", "odata.include-annotations=\"*\"");
+            req.onreadystatechange = function() {
+                if (this.readyState === 4) {
+                    req.onreadystatechange = null;
+                    if (this.status === 200) {
+                        var results = JSON.parse(this.response);
+                        if(results.value==null || results.value.length==0)
+                        {
+                            document.getElementById("customhelpcontent").innerText="Invalid Configuration! No help content found";
+                        }
+                        else
+                        {
+                            var currentValue = results.value[0];
+                            document.title = currentValue.helpcc_name;
+                            document.getElementById("customhelpcontent").innerHTML = currentValue.helpcc_helpcontent;
+                        }
+                    } else {
+                        Xrm.Utility.alertDialog(this.statusText);
+                    }
+                }
+            };
+            req.send();
+
+        }
+        </script>
+    </head>
+    <body onload="getHelpContent()">
+        <div id="customhelpcontent"></div>
+    </body>
+</html>
